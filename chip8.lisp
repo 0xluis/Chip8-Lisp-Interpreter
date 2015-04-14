@@ -56,7 +56,8 @@
 (defun decodeop()
   (case (logand *opcode* #xF000)
     (#x0000 (case (logand *opcode* #x00FF)
-             (#x00E0 (string "Clear Screen")) ;;opcode 00E0 clear screen
+             (#x00E0 for i from 0 to 2048
+                     do (setf (aref *gfx* i) 0));;(string "Clear Screen")) ;;opcode 00E0 clear screen
              (#x00EE (string "return from sub")) ;;opcode 00EE return from subroutine
              (otherwise (string "Fucked up 0x0XXX opcode!"))))
 	(#x1000 (string "Jump to address")) ;;1NNN
@@ -78,10 +79,20 @@
               (#x0004 (let ((sum 0)) (setq sum (+ (aref *v* (ash (logand *opcode* #x0F00) -8)) (aref *v* (ash (logand *opcode* #x00F0) -4))))
                       (setf (aref *v* (ash (logand *opcode* #x0F00) -8)) (logand sum #xFFFF))
                       (setf (aref *v* 15) (ash (logand sum #xF0000) -16))));;(string "Add VY to VX VF is carry")) ;;8XY4
-              (#x0005 (string "VX - VY Vf is 0 when borrow")) ;;8XY5
-              (#x0006 (string "Shift VX right by 1 VF is [0]")) ;;8XY6
-              (#x0007 (string "VX = VY-VX  VF 0 when borrow")) ;;8XY7
-              (#x000E (string "VX left shift by 1 VF is [15]")) ;;8XYE
+              (#x0005 (let((diff 0)) (setq diff (-(aref *v* (ash (logand *opcode* #x0F00) -8))(aref *v* (ash (logand *opcode* #x00F0) -4))))
+                      (setq (aref *v* (ash (logand *opcode* #x0F00) -8)) diff)
+                       (if (< diff 0)
+                           (setf (aref *v* 15) 0)
+                           (setf (aref *v* 15) 1))));;(string "VX - VY Vf is 0 when borrow")) ;;8XY5
+              (#x0006 (setq (aref *v* 15) (logand (aref *v* (ash (logand *opcode* #x0F00) -8)) #x0001))
+                      (setq (aref *v* (ash (logand *opcode* #x0F00) -8)) (ash (aref *v* (ash (logand *opcode* #x0F00) -8)) -1)));;(string "Shift VX right by 1 VF is [0]")) ;;8XY6
+              (#x0007 (let((diff 0)) (setq diff (-(aref *v* (ash (logand *opcode* #x00F0) -4))(aref *v* (ash (logand *opcode* #x0F00) -8))))
+                      (setq (aref *v* (ash (logand *opcode* #x0F00) -8)) diff)
+                       (if (< diff 0)
+                           (setf (aref *v* 15) 0)
+                           (setf (aref *v* 15) 1))));;(string "VX = VY-VX  VF 0 when borrow")) ;;8XY7
+              (#x000E (setq (aref *v* 15) (logand (aref *v* (ash (logand *opcode* #x0F00) -8)) #xF0))
+                      (setq (aref *v* (ash (logand *opcode* #x0F00) -8)) (ash (aref *v* (ash (logand *opcode* #x0F00) -8)) 1)));;(string "VX left shift by 1 VF is [15]")) ;;8XYE
               (otherwise (string "Fucked up 0x8XXX opcode!"))))
     (#x9000 (string "skip instruction if VX != VY")) ;;9XY0
     (#xA000 (string "Sets I to NNN")) ;; ANNN
